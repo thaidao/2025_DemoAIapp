@@ -7,7 +7,7 @@ from openai import OpenAI
 # ✅ CONFIGURATION
 DURATION = 5  # seconds
 OUTPUT_FILE = "recorded_audio.wav"
-OPENROUTER_API_KEY = "tbd"  # Replace with your key
+OPENROUTER_API_KEY = "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"  # Replace with your key
 
 # ✅ RECORD AUDIO
 def record_audio(filename, duration):
