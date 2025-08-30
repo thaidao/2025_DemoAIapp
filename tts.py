@@ -1,12 +1,13 @@
 import pyttsx3
 import sounddevice as sd
+import soundfile as sf
 import numpy as np
 import serial
 import time
+import threading
 
 # Init serial and TTS
-#ser = serial.Serial('/dev/ttyACM0', 9600) #linux based
-ser = serial.Serial('COM6', 9600) #window
+ser = serial.Serial('COM6', 9600)  # Windows COM port
 engine = pyttsx3.init()
 text = "What a beautiful day, how are you?"
 
@@ -14,37 +15,53 @@ text = "What a beautiful day, how are you?"
 frame_duration = 0.1  # 100 ms
 fs = 16000  # Sample rate
 
-def speak_and_control(text):
-    def callback(outdata, frames, time_info, status):
-        pass  # We only play audio, not record
 
-    stream = sd.OutputStream(samplerate=fs, channels=1, callback=callback)
-    stream.start()
-
-    engine.save_to_file(text, "speech.wav")
-    play_and_analyze("speech.wav")
-    engine.say(text)
+def generate_speech(text, filename="speech.wav"):
+    """Generate TTS audio file"""
+    engine.save_to_file(text, filename)
     engine.runAndWait()
-    stream.stop()
-    stream.close()
+
 
 def play_and_analyze(filename="speech.wav"):
-    import soundfile as sf
-    data, samplerate = sf.read(filename)
+    """Play audio and control servos in sync"""
+    data, samplerate = sf.read(filename, dtype="float32")
     chunk_size = int(frame_duration * samplerate)
 
-    for i in range(0, len(data), chunk_size):
-        chunk = data[i:i+chunk_size]
-        if len(chunk) == 0:
-            continue
+    # index pointer for chunks
+    frame_idx = [0]
+
+    def callback(outdata, frames, time_info, status):
+        if status:
+            print(status)
+
+        start = frame_idx[0]
+        end = start + frames
+        if end > len(data):
+            outdata[: len(data) - start] = data[start:]
+            outdata[len(data) - start :] = 0
+            raise sd.CallbackStop()
+
+        out_chunk = data[start:end]
+        outdata[:] = out_chunk.reshape(-1, 1)
+
+        # ---- Servo control ----
+        # Use same chunk to calculate volume
+        chunk = out_chunk
         volume = np.linalg.norm(chunk)
         angle = int(np.clip(volume * 300, 20, 120))  # map to servo angle
         duration_ms = int(frame_duration * 1000)
 
         msg = f"<JAW:{angle}:{duration_ms}|HAND:90:0>\n"
         ser.write(msg.encode())
-        time.sleep(frame_duration)
 
-speak_and_control(text)
-time.sleep(1)  # wait for file to be written
-#play_and_analyze("speech.wav")
+        # move index forward
+        frame_idx[0] = end
+
+    with sd.OutputStream(samplerate=samplerate, channels=1, callback=callback):
+        sd.sleep(int(len(data) / samplerate * 1000))  # wait until playback done
+
+
+# ---- Main ----
+generate_speech(text, "speech.wav")
+time.sleep(0.5)  # ensure file is written
+play_and_analyze("speech.wav")
