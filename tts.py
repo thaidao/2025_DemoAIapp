@@ -9,7 +9,8 @@ import threading
 # Init serial and TTS
 ser = serial.Serial('COM6', 9600)  # Windows COM port
 engine = pyttsx3.init()
-text = "What a beautiful day, how are you?"
+# text = "What a beautiful day, how are you?"
+text = "The quick fox jumps over the lazy dog. Then he ate all grapes in a garden. A farmer got mad of the lazy dog. Next time, when the fox come over, he didn't see that dog anymore"
 
 # Config
 frame_duration = 0.1  # 100 ms
@@ -48,7 +49,7 @@ def play_and_analyze(filename="speech.wav"):
         # Use same chunk to calculate volume
         chunk = out_chunk
         volume = np.linalg.norm(chunk)
-        angle = int(np.clip(volume * 300, 20, 120))  # map to servo angle
+        angle = int(np.clip(volume * 300, 0, 100))  # map to servo angle from 0 to 120 degree,  # jaw: 0 = closed, 120 = wide open
         duration_ms = int(frame_duration * 1000)
 
         msg = f"<JAW:{angle}:{duration_ms}|HAND:90:0>\n"
